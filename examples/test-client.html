@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIP WebSocket Proxy - Test Client</title>
+    <script src="https://cdn.jsdelivr.net/npm/jssip@3.10.0/dist/jssip.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #218838;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+        }
+        .status {
+            padding: 10px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status.registered {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.calling {
+            background-color: #cce5ff;
+            color: #004085;
+        }
+        .logs {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px;
+        }
+        .log-info {
+            color: #0056b3;
+        }
+        .log-error {
+            color: #dc3545;
+        }
+        .log-success {
+            color: #28a745;
+        }
+        #phone-controls {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 SIP WebSocket Proxy - Test Client</h1>
+        
+        <div id="login-form">
+            <h2>Login Configuration</h2>
+            <div class="form-group">
+                <label for="proxy-url">WebSocket Proxy URL:</label>
+                <input type="text" id="proxy-url" value="wss://sipproxy.yourdomain.com:443" placeholder="wss://sipproxy.yourdomain.com:443">
+            </div>
+            <div class="form-group">
+                <label for="sip-domain">SIP Domain:</label>
+                <input type="text" id="sip-domain" value="" placeholder="sip.mycompany.com">
+            </div>
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" value="" placeholder="user123">
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" value="" placeholder="••••••••">
+            </div>
+            <div class="form-group">
+                <label for="display-name">Display Name (Optional):</label>
+                <input type="text" id="display-name" value="" placeholder="John Doe">
+            </div>
+            <button class="btn-primary" onclick="register()">📞 Connect & Register</button>
+        </div>
+
+        <div id="phone-controls">
+            <h2>Phone Controls</h2>
+            <div class="status registered">
+                <span id="status-text">Status: Registered</span>
+            </div>
+            
+            <div class="form-group">
+                <label for="destination">Destination Number/Extension:</label>
+                <input type="text" id="destination" value="" placeholder="1001">
+            </div>
+            
+            <button class="btn-success" onclick="makeCall()">📞 Call</button>
+            <button class="btn-danger" onclick="hangup()">❌ Hangup</button>
+            <button class="btn-primary" onclick="disconnect()">🔌 Disconnect</button>
+            
+            <audio id="remote-audio" autoplay></audio>
+            <audio id="local-audio" muted autoplay></audio>
+        </div>
+
+        <div class="logs">
+            <div id="log-container"></div>
+        </div>
+    </div>
+
+    <script>
+        // Enable JsSIP debug
+        JsSIP.debug.enable('JsSIP:*');
+
+        let userAgent = null;
+        let currentSession = null;
+
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('log-container');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateStatus(text, className) {
+            const statusDiv = document.querySelector('.status');
+            const statusText = document.getElementById('status-text');
+            statusDiv.className = `status ${className}`;
+            statusText.textContent = `Status: ${text}`;
+        }
+
+        function register() {
+            const proxyUrl = document.getElementById('proxy-url').value;
+            const sipDomain = document.getElementById('sip-domain').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const displayName = document.getElementById('display-name').value;
+
+            if (!proxyUrl || !sipDomain || !username || !password) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            log(`Connecting to WebSocket: ${proxyUrl}`, 'info');
+            updateStatus('Connecting...', 'connecting');
+
+            const socket = new JsSIP.WebSocketInterface(proxyUrl);
+            
+            const configuration = {
+                sockets: [socket],
+                uri: `sip:${username}@${sipDomain}`,
+                password: password,
+                display_name: displayName || username,
+                register: true,
+                register_expires: 600,
+                session_timers: false
+            };
+
+            userAgent = new JsSIP.UA(configuration);
+
+            // Event handlers
+            userAgent.on('connected', function(e) {
+                log('✅ WebSocket connected successfully', 'success');
+            });
+
+            userAgent.on('disconnected', function(e) {
+                log('❌ WebSocket disconnected', 'error');
+                updateStatus('Disconnected', 'disconnected');
+                showLoginForm();
+            });
+
+            userAgent.on('registered', function(e) {
+                log('✅ Successfully registered to SIP server', 'success');
+                updateStatus('Registered', 'registered');
+                showPhoneControls();
+            });
+
+            userAgent.on('unregistered', function(e) {
+                log('⚠️ Unregistered from SIP server', 'info');
+                updateStatus('Unregistered', 'disconnected');
+            });
+
+            userAgent.on('registrationFailed', function(e) {
+                log(`❌ Registration failed: ${e.cause}`, 'error');
+                updateStatus('Registration Failed', 'disconnected');
+                alert(`Registration failed: ${e.cause}`);
+            });
+
+            userAgent.on('newRTCSession', function(e) {
+                currentSession = e.session;
+                
+                if (currentSession.direction === 'incoming') {
+                    log(`📞 Incoming call from: ${currentSession.remote_identity.uri.user}`, 'info');
+                    updateStatus('Incoming Call', 'calling');
+                    
+                    if (confirm(`Incoming call from ${currentSession.remote_identity.uri.user}. Answer?`)) {
+                        answerCall(currentSession);
+                    } else {
+                        currentSession.terminate();
+                    }
+                }
+
+                setupSessionHandlers(currentSession);
+            });
+
+            userAgent.start();
+        }
+
+        function setupSessionHandlers(session) {
+            session.on('peerconnection', function(e) {
+                log('🔗 Peer connection established', 'info');
+                
+                e.peerconnection.ontrack = function(event) {
+                    log('🎵 Remote audio stream received', 'success');
+                    document.getElementById('remote-audio').srcObject = event.streams[0];
+                };
+            });
+
+            session.on('accepted', function(e) {
+                log('✅ Call accepted', 'success');
+                updateStatus('Call Active', 'calling');
+            });
+
+            session.on('progress', function(e) {
+                log('📞 Call in progress (ringing)...', 'info');
+                updateStatus('Calling...', 'calling');
+            });
+
+            session.on('confirmed', function(e) {
+                log('✅ Call confirmed', 'success');
+                updateStatus('Call Connected', 'calling');
+            });
+
+            session.on('ended', function(e) {
+                log('📴 Call ended', 'info');
+                updateStatus('Registered', 'registered');
+                currentSession = null;
+            });
+
+            session.on('failed', function(e) {
+                log(`❌ Call failed: ${e.cause}`, 'error');
+                updateStatus('Registered', 'registered');
+                currentSession = null;
+            });
+        }
+
+        function makeCall() {
+            if (!userAgent) {
+                alert('Please register first');
+                return;
+            }
+
+            const destination = document.getElementById('destination').value;
+            if (!destination) {
+                alert('Please enter a destination number');
+                return;
+            }
+
+            const sipDomain = document.getElementById('sip-domain').value;
+            const targetUri = `sip:${destination}@${sipDomain}`;
+
+            log(`📞 Calling: ${targetUri}`, 'info');
+            updateStatus('Calling...', 'calling');
+
+            const options = {
+                mediaConstraints: {
+                    audio: true,
+                    video: false
+                },
+                pcConfig: {
+                    iceServers: [
+                        { urls: ['stun:stun.l.google.com:19302'] }
+                    ]
+                }
+            };
+
+            currentSession = userAgent.call(targetUri, options);
+            setupSessionHandlers(currentSession);
+        }
+
+        function answerCall(session) {
+            const options = {
+                mediaConstraints: {
+                    audio: true,
+                    video: false
+                }
+            };
+
+            session.answer(options);
+            log('✅ Answering incoming call', 'success');
+        }
+
+        function hangup() {
+            if (currentSession) {
+                currentSession.terminate();
+                log('📴 Hanging up call', 'info');
+            } else {
+                log('⚠️ No active call to hang up', 'info');
+            }
+        }
+
+        function disconnect() {
+            if (userAgent) {
+                userAgent.stop();
+                log('🔌 Disconnecting from SIP server', 'info');
+                updateStatus('Disconnected', 'disconnected');
+                showLoginForm();
+            }
+        }
+
+        function showPhoneControls() {
+            document.getElementById('login-form').style.display = 'none';
+            document.getElementById('phone-controls').style.display = 'block';
+        }
+
+        function showLoginForm() {
+            document.getElementById('login-form').style.display = 'block';
+            document.getElementById('phone-controls').style.display = 'none';
+        }
+
+        // Initial log
+        log('🌐 SIP WebSocket Test Client Ready', 'info');
+        log('ℹ️ Enter your SIP credentials and proxy URL to connect', 'info');
+    </script>
+</body>
+</html>

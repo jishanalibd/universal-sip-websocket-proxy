@@ -152,6 +152,25 @@ sudo journalctl -u rtpengine -f
 wscat -c wss://sipproxy.yourdomain.com:443
 ```
 
+### Test Client
+
+A ready-to-use web-based test client is included in the `examples/` directory:
+
+```bash
+# Serve the test client
+cd examples
+python3 -m http.server 8000
+# Open http://localhost:8000/test-client.html in your browser
+```
+
+The test client allows you to:
+- Connect to your WebSocket proxy
+- Register with any SIP server
+- Make and receive calls
+- View real-time logs
+
+See [examples/README.md](examples/README.md) for more details.
+
 ## 📁 Project Structure
 
 ```
@@ -168,6 +187,9 @@ wscat -c wss://sipproxy.yourdomain.com:443
 │   ├── INSTALLATION.md     # Detailed installation guide
 │   ├── CLIENT-EXAMPLES.md  # Client configuration examples
 │   └── TROUBLESHOOTING.md  # Troubleshooting guide
+├── examples/
+│   ├── test-client.html    # Web-based test client
+│   └── README.md           # Examples documentation
 └── README.md
 ```
 
