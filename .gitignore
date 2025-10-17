@@ -1,0 +1,46 @@
+# Temporary files
+*.tmp
+*.log
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Editor files
+.vscode/
+.idea/
+*.iml
+
+# System files
+Thumbs.db
+desktop.ini
+
+# Test files
+/tmp/
+/test/
+
+# SSL certificates (should not be committed)
+*.pem
+*.key
+*.crt
+*.csr
+
+# Configuration overrides (may contain sensitive data)
+config/local/
+*.local.cfg
+*-local.conf
+
+# Build artifacts
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Documentation build
+docs/_build/
