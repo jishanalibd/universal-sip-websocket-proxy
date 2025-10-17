@@ -80,6 +80,8 @@ sudo systemctl start rtpengine
 
 See [docs/INSTALLATION.md](docs/INSTALLATION.md) for step-by-step installation instructions.
 
+For quick command reference, see [docs/QUICK-REFERENCE.md](docs/QUICK-REFERENCE.md).
+
 ## 🔧 Configuration
 
 ### Kamailio Configuration
